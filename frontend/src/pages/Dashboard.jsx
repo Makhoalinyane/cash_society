@@ -129,8 +129,11 @@ export default function Dashboard() {
   if (loading) return <div className="loading">Loading dashboard...</div>;
 
   const bal = summary?.societyBalance || {};
-  const totalWithLoansInHands =
-    Number(bal.availableBalance || 0) + Number(bal.outstandingLoans || 0);
+  const penaltiesStillOwing = Number(summary?.penaltiesStillOwing || 0);
+  const totalSocietyPosition =
+    Number(bal.availableBalance || 0)
+    + Number(bal.outstandingLoans || 0)
+    + penaltiesStillOwing;
 
   return (
     <div>
@@ -204,10 +207,10 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="card">
-          <div className="card-title">Total (Savings + Loans Out)</div>
-          <div className="card-value stat-positive">{formatMoney(totalWithLoansInHands)}</div>
+          <div className="card-title">Total Society Position</div>
+          <div className="card-value stat-positive">{formatMoney(totalSocietyPosition)}</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Savings account + money still in members&apos; hands
+            Savings + loans out + penalties still owing
           </p>
         </div>
       </div>
@@ -314,9 +317,9 @@ export default function Dashboard() {
           <br />
           <strong>Outstanding loans</strong> are separate: money members still owe. That cash is not in the account until they repay.
           <br />
-          <strong>Total (savings + loans out)</strong> = savings + outstanding loans = <strong>{formatMoney(totalWithLoansInHands)}</strong>
+          <strong>Penalties still owing</strong> = late fees not yet recorded as paid across all members = <strong>{formatMoney(penaltiesStillOwing)}</strong>
           <br />
-          <strong>Penalties still owing</strong> = late fees not yet recorded as paid across all members = <strong>{formatMoney(summary?.penaltiesStillOwing)}</strong>
+          <strong>Total society position</strong> = savings + outstanding loans + penalties still owing = <strong>{formatMoney(totalSocietyPosition)}</strong>
           <br />
           <strong>Equal share now</strong> = savings balance ÷ active members = <strong>{formatMoney(summary?.sharePerMember)}</strong>
         </p>

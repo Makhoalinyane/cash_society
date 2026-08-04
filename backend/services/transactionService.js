@@ -662,6 +662,10 @@ async function getSocietySummary(year = new Date().getFullYear()) {
 
   const societyBalance = calculateSocietyBalance(transactions, loans, year);
   const penaltiesStillOwing = getSocietyPenaltiesStillOwing(transactions, members, year);
+  const totalSocietyPosition =
+    Number(societyBalance.availableBalance || 0)
+    + Number(societyBalance.outstandingLoans || 0)
+    + Number(penaltiesStillOwing.total || 0);
 
   const sharePerMember = activeMembers > 0
     ? Math.max(0, societyBalance.availableBalance / activeMembers)
@@ -670,10 +674,16 @@ async function getSocietySummary(year = new Date().getFullYear()) {
   return {
     year,
     activeMembers,
-    societyBalance,
+    societyBalance: {
+      ...societyBalance,
+      penaltiesStillOwing: penaltiesStillOwing.total,
+      unpaidPenaltyMonths: penaltiesStillOwing.monthCount,
+      totalSocietyPosition,
+    },
     sharePerMember,
     penaltiesStillOwing: penaltiesStillOwing.total,
     unpaidPenaltyMonths: penaltiesStillOwing.monthCount,
+    totalSocietyPosition,
   };
 }
 
