@@ -6,11 +6,12 @@ module.exports = {
   LATE_PENALTY_AMOUNT: 275,
   CONTRIBUTION_DUE_DAY: 8,
   // Cash held before recorded 2026 activity.
-  // Calibrated to real savings M24,192. Later, a M300 interest payment that was
-  // already inside that cash figure was recorded in the app — opening was reduced
-  // by M300 so it is not double-counted in Available Balance.
+  // Target was real savings M24,192 when year txs showed M17,822:
+  // opening = 24192 - 17822 = 6370. A M300 interest later recorded in-app was
+  // already inside that cash figure, so opening is 6370 - 300 = 6070
+  // (earlier calibration used 6369.50 / 6069.50 and understated by M0.50).
   SOCIETY_OPENING_BALANCE_BY_YEAR: {
-    2026: 6069.5,
+    2026: 6070,
   },
   MAX_LOAN_AMOUNT: 2000,
   LOAN_INTEREST_RATE: 0.15,

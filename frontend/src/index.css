@@ -22,11 +22,12 @@
 }
 
 body {
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: "Segoe UI", "Avenir Next", "Nunito Sans", ui-sans-serif, sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
   min-height: 100vh;
+  text-rendering: optimizeLegibility;
 }
 
 a {

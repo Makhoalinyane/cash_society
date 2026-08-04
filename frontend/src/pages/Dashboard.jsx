@@ -174,25 +174,31 @@ export default function Dashboard() {
 
       <div className="grid grid-4" style={{ marginBottom: '2rem' }}>
         <div className="card">
-          <div className="card-title">Available Balance</div>
+          <div className="card-title">Savings Account Balance</div>
           <div className="card-value stat-positive">{formatMoney(bal.availableBalance)}</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Opening balance + Total In − Total Out
+            Cash in the society savings (opening + all money in − all money out)
           </p>
         </div>
         <div className="card">
           <div className="card-title">Outstanding Loans</div>
           <div className="card-value stat-negative">{formatMoney(bal.outstandingLoans)}</div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+            Still with members — not in the savings account yet
+          </p>
         </div>
         <div className="card">
-          <div className="card-title">Distributable Balance</div>
-          <div className="card-value stat-positive">{formatMoney(bal.distributableBalance)}</div>
-        </div>
-        <div className="card">
-          <div className="card-title">Share Per Member (if shared now)</div>
+          <div className="card-title">If Shared Equally Now</div>
           <div className="card-value stat-warning">{formatMoney(summary?.sharePerMember)}</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            {summary?.activeMembers} active members
+            Savings ÷ {summary?.activeMembers || 0} active members
+          </p>
+        </div>
+        <div className="card">
+          <div className="card-title">Money Still Lending</div>
+          <div className="card-value">{formatMoney(bal.loanDisbursements)}</div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+            Total loan cash paid out this year
           </p>
         </div>
       </div>
@@ -271,11 +277,12 @@ export default function Dashboard() {
       <div className="card" style={{ marginBottom: '2rem' }}>
         <h3 style={{ marginBottom: '0.75rem' }}>How the balance works</h3>
         <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-          Available balance includes cash held before 1 January, plus every M-Pesa transaction recorded for the selected year.
+          <strong>Savings account balance</strong> is the cash actually held (what matches the bank / M-Pesa savings).
+          If members share money, it comes from this figure — not from outstanding loans.
         </p>
         <div className="grid grid-2">
           <div>
-            <strong className="stat-positive">Adds to balance (+)</strong>
+            <strong className="stat-positive">Adds to savings (+)</strong>
             <ul className="rules-list" style={{ marginTop: '0.5rem' }}>
               <li>Opening balance (cash before 1 Jan)</li>
               <li>Monthly contributions (M550)</li>
@@ -285,18 +292,20 @@ export default function Dashboard() {
             </ul>
           </div>
           <div>
-            <strong className="stat-negative">Subtracts from balance (−)</strong>
+            <strong className="stat-negative">Leaves savings (−)</strong>
             <ul className="rules-list" style={{ marginTop: '0.5rem' }}>
-              <li>Loan disbursements (money lent out)</li>
+              <li>Loan disbursements (money lent to members)</li>
               <li>Savings returns (year-end M500 payouts)</li>
               <li>Interest rebates (10% back to members)</li>
             </ul>
           </div>
         </div>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '1rem' }}>
-          <strong>Available Balance</strong> = {formatMoney(bal.openingBalance || 0)} (opening) + {formatMoney(bal.moneyInFromTransactions ?? ((bal.moneyIn || 0) - (bal.openingBalance || 0)))} (year txs in) − {formatMoney(bal.moneyOut)} (out) = <strong>{formatMoney(bal.availableBalance)}</strong>
+          <strong>Savings balance</strong> = {formatMoney(bal.openingBalance || 0)} (opening) + {formatMoney(bal.moneyInFromTransactions ?? ((bal.moneyIn || 0) - (bal.openingBalance || 0)))} (year money in) − {formatMoney(bal.moneyOut)} (out) = <strong>{formatMoney(bal.availableBalance)}</strong>
           <br />
-          <strong>Distributable Balance</strong> = Available Balance − Outstanding Loans = <strong>{formatMoney(bal.distributableBalance)}</strong>
+          <strong>Outstanding loans</strong> are separate: money members still owe. That cash is not in the account until they repay.
+          <br />
+          <strong>Equal share now</strong> = savings balance ÷ active members = <strong>{formatMoney(summary?.sharePerMember)}</strong>
         </p>
       </div>
 

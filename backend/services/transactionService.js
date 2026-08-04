@@ -662,7 +662,7 @@ async function getSocietySummary(year = new Date().getFullYear()) {
   const activeMembers = memberCount[0].count;
 
   const sharePerMember = activeMembers > 0
-    ? Math.max(0, societyBalance.distributableBalance / activeMembers)
+    ? Math.max(0, societyBalance.availableBalance / activeMembers)
     : 0;
 
   return {

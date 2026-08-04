@@ -183,7 +183,9 @@ export default function MemberDetail() {
                       paid: 'Paid on time',
                       paid_late_settled: 'Paid late (settled)',
                       paid_late_penalty_owed: 'Paid late — penalty owing',
-                      shortfall: 'Partial — balance owing',
+                      shortfall: row.penaltyOwed > 0
+                        ? 'Partial + late penalty owing'
+                        : 'Partial — balance owing',
                       overdue: 'Missing — overdue',
                       due: 'Due this month',
                     }[row.status] || row.status;

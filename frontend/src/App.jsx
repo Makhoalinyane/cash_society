@@ -1,4 +1,4 @@
-import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import Members from './pages/Members';
@@ -14,7 +14,7 @@ function isLocalHost() {
   return host === 'localhost' || host === '127.0.0.1';
 }
 
-function AdminUnlock() {
+function AdminUnlock({ onUnlocked }) {
   const [key, setKey] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
@@ -26,7 +26,7 @@ function AdminUnlock() {
     try {
       setAdminKey(key.trim());
       await api.verifyAdmin();
-      window.location.reload();
+      onUnlocked();
     } catch (err) {
       clearAdminKey();
       setError(err.message || 'Invalid admin key');
@@ -64,26 +64,38 @@ function AdminUnlock() {
 function AppShell({ children }) {
   const viewOnly = useIsViewOnly();
   const link = useAppLink();
-  const location = useLocation();
   const needsUnlock = !viewOnly && !isLocalHost();
   const [adminReady, setAdminReady] = useState(!needsUnlock || Boolean(getAdminKey()));
+  const [checkingAdmin, setCheckingAdmin] = useState(needsUnlock && Boolean(getAdminKey()));
 
   useEffect(() => {
     if (!needsUnlock) {
       setAdminReady(true);
+      setCheckingAdmin(false);
       return;
     }
     if (!getAdminKey()) {
       setAdminReady(false);
+      setCheckingAdmin(false);
       return;
     }
+
+    let cancelled = false;
+    setCheckingAdmin(true);
     api.verifyAdmin()
-      .then(() => setAdminReady(true))
+      .then(() => {
+        if (!cancelled) setAdminReady(true);
+      })
       .catch(() => {
         clearAdminKey();
-        setAdminReady(false);
+        if (!cancelled) setAdminReady(false);
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingAdmin(false);
       });
-  }, [needsUnlock, location.pathname]);
+
+    return () => { cancelled = true; };
+  }, [needsUnlock]);
 
   return (
     <div className={`app-layout ${viewOnly ? 'view-only' : ''}`}>
@@ -119,7 +131,13 @@ function AppShell({ children }) {
         </nav>
       </aside>
       <main className="main-content">
-        {needsUnlock && !adminReady ? <AdminUnlock /> : children}
+        {checkingAdmin ? (
+          <div className="loading">Loading…</div>
+        ) : needsUnlock && !adminReady ? (
+          <AdminUnlock onUnlocked={() => setAdminReady(true)} />
+        ) : (
+          children
+        )}
       </main>
     </div>
   );

@@ -176,7 +176,10 @@ function getUnpaidPenalties(transactions, year, asOfDate = new Date()) {
   );
 
   return yearTx
-    .filter((t) => t.transaction_type === 'contribution' && t.is_late)
+    .filter((t) => t.transaction_type === 'contribution')
+    .filter((t) => Boolean(t.is_late) || isContributionLate(t.transaction_date))
+    // Full contributions only — shortfalls already show late penalty on the month row
+    .filter((t) => Number(t.amount) >= CONST.MONTHLY_CONTRIBUTION)
     .filter((t) => isMonthOnOrBefore(t.transaction_year, t.transaction_month, asOfYear, asOfMonth))
     .filter((t) => !penaltiesPaidMonths.has(t.transaction_month))
     .map((t) => ({
@@ -244,10 +247,14 @@ function getContributionMonthStatuses(transactions, year, joinedDate, asOfDate =
     if (contribution) {
       const paid = Number(contribution.amount);
       const shortfall = Math.max(0, CONST.MONTHLY_CONTRIBUTION - paid);
-      const late = Boolean(contribution.is_late);
+      // Prefer calendar date over stored flag (timezone-safe with dateStrings)
+      const late = Boolean(contribution.is_late) || isContributionLate(contribution.transaction_date);
       const penaltyOwed = late && !penaltyPaid ? CONST.LATE_PENALTY_AMOUNT : 0;
 
       if (shortfall > 0) {
+        const lateHint = late && !penaltyPaid
+          ? ` + late penalty M${CONST.LATE_PENALTY_AMOUNT} (paid after the ${CONST.CONTRIBUTION_DUE_DAY}th)`
+          : '';
         statuses.push({
           month: m,
           monthName: getMonthName(m),
@@ -258,7 +265,7 @@ function getContributionMonthStatuses(transactions, year, joinedDate, asOfDate =
           penaltyOwed,
           totalOwed: shortfall + penaltyOwed,
           paidOn: contribution.transaction_date,
-          hint: `Partial payment — M${paid.toFixed(2)} paid, M${shortfall.toFixed(2)} still outstanding for ${getMonthName(m)}`,
+          hint: `Partial payment — M${paid.toFixed(2)} paid, M${shortfall.toFixed(2)} still outstanding for ${getMonthName(m)}${lateHint}`,
         });
       } else if (late && !penaltyPaid) {
         statuses.push({
@@ -452,10 +459,9 @@ function calculateTotalOutstanding(transactions, loans, joinedDate, throughYear,
   let total = getActiveLoanOutstanding(loans);
 
   for (let year = joinYear; year <= throughYear; year++) {
-    const missed = getMissedContributions(transactions, year, joinedDate, asOfDate);
-    total += missed.reduce((sum, m) => sum + m.totalDue, 0);
-    // Penalties for contributions paid late but not yet settled
-    total += getUnpaidPenaltyOwed(transactions, year, asOfDate);
+    // Month statuses already include contribution shortfalls + late penalties (no double-count)
+    const statuses = getContributionMonthStatuses(transactions, year, joinedDate, asOfDate);
+    total += statuses.reduce((sum, s) => sum + Number(s.totalOwed || 0), 0);
   }
 
   return total;
@@ -480,10 +486,9 @@ function calculateYearEndStatus(allTransactions, allLoans, joinedDate, targetYea
   const contributionStatusSummary = getContributionStatusSummary(contributionMonthStatuses);
   const missedContributions = getMissedContributions(allTransactions, targetYear, joinedDate, asOfDate);
   const contributionShortfall = missedContributions.reduce((sum, m) => sum + m.amount, 0);
+  // Late penalties on fully-paid contributions (shortfall/overdue penalties live in month statuses)
   const unpaidPenalties = getUnpaidPenalties(allTransactions, targetYear, asOfDate);
-  const overdueMissedPenalties = missedContributions.reduce((sum, m) => sum + m.penaltyDue, 0);
-  const penaltyOwed =
-    unpaidPenalties.reduce((sum, p) => sum + p.amount, 0) + overdueMissedPenalties;
+  const penaltyOwed = contributionStatusSummary.totalPenaltyOwed;
   const loanOutstanding = getActiveLoanOutstanding(allLoans);
   const loanSchedules = allLoans
     .filter((l) => l.status === 'active')
@@ -794,7 +799,9 @@ function calculateSocietyBalance(allTransactions, allLoans, year = new Date().ge
     }, 0);
 
   const availableBalance = moneyIn - moneyOut;
-  const distributableBalance = availableBalance - outstandingLoans;
+  // What members can share from is the savings cash only. Loan balances are
+  // already reflected in cash (disbursements left the account; repayments return).
+  const distributableBalance = availableBalance;
   const pendingMemberRebates = calculateMemberInterestRebate(interestPayments) - rebates;
   const societyInterestRetained = calculateSocietyInterestShare(interestPayments);
 
