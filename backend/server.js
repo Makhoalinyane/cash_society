@@ -23,7 +23,13 @@ app.get('/api/health', async (req, res) => {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', database: 'connected' });
   } catch (err) {
-    res.status(503).json({ status: 'error', database: 'disconnected', error: err.message });
+    console.error('DB health check failed:', err.code || '', err.message || err);
+    res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      error: err.message || err.code || 'Database connection failed',
+      code: err.code || null,
+    });
   }
 });
 
