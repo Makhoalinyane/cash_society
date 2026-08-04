@@ -66,6 +66,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Cash Society running on port ${PORT}${hasFrontend ? ' (API + frontend)' : ' (API only)'}`);
+const HOST = process.env.IP || process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+  console.log(`Cash Society running on ${HOST}:${PORT}${hasFrontend ? ' (API + frontend)' : ' (API only)'}`);
 });
