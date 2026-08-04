@@ -129,6 +129,8 @@ export default function Dashboard() {
   if (loading) return <div className="loading">Loading dashboard...</div>;
 
   const bal = summary?.societyBalance || {};
+  const totalWithLoansInHands =
+    Number(bal.availableBalance || 0) + Number(bal.outstandingLoans || 0);
 
   return (
     <div>
@@ -195,10 +197,10 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="card">
-          <div className="card-title">Money Still Lending</div>
-          <div className="card-value">{formatMoney(bal.loanDisbursements)}</div>
+          <div className="card-title">Total (Savings + Loans Out)</div>
+          <div className="card-value stat-positive">{formatMoney(totalWithLoansInHands)}</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Total loan cash paid out this year
+            Savings account + money still in members&apos; hands
           </p>
         </div>
       </div>
@@ -304,6 +306,8 @@ export default function Dashboard() {
           <strong>Savings balance</strong> = {formatMoney(bal.openingBalance || 0)} (opening) + {formatMoney(bal.moneyInFromTransactions ?? ((bal.moneyIn || 0) - (bal.openingBalance || 0)))} (year money in) − {formatMoney(bal.moneyOut)} (out) = <strong>{formatMoney(bal.availableBalance)}</strong>
           <br />
           <strong>Outstanding loans</strong> are separate: money members still owe. That cash is not in the account until they repay.
+          <br />
+          <strong>Total (savings + loans out)</strong> = savings + outstanding loans = <strong>{formatMoney(totalWithLoansInHands)}</strong>
           <br />
           <strong>Equal share now</strong> = savings balance ÷ active members = <strong>{formatMoney(summary?.sharePerMember)}</strong>
         </p>
