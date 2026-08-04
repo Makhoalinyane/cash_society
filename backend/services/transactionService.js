@@ -12,6 +12,7 @@ const {
   getChargeableInterestMonths,
   getInterestMonthSchedule,
   groupTransactionsByMonth,
+  getSocietyPenaltiesStillOwing,
 } = require('./calculations');
 
 async function getMemberTransactions(memberId, year = null) {
@@ -656,10 +657,11 @@ async function getSocietySummary(year = new Date().getFullYear()) {
     [year]
   );
   const [loans] = await pool.query('SELECT * FROM loans WHERE loan_year = ? OR status = ?', [year, 'active']);
-  const [memberCount] = await pool.query('SELECT COUNT(*) as count FROM members WHERE is_active = 1');
+  const [members] = await pool.query('SELECT id, joined_date FROM members WHERE is_active = 1');
+  const activeMembers = members.length;
 
   const societyBalance = calculateSocietyBalance(transactions, loans, year);
-  const activeMembers = memberCount[0].count;
+  const penaltiesStillOwing = getSocietyPenaltiesStillOwing(transactions, members, year);
 
   const sharePerMember = activeMembers > 0
     ? Math.max(0, societyBalance.availableBalance / activeMembers)
@@ -670,6 +672,8 @@ async function getSocietySummary(year = new Date().getFullYear()) {
     activeMembers,
     societyBalance,
     sharePerMember,
+    penaltiesStillOwing: penaltiesStillOwing.total,
+    unpaidPenaltyMonths: penaltiesStillOwing.monthCount,
   };
 }
 

@@ -743,6 +743,30 @@ function calculateMemberBalance(transactions, loans) {
   };
 }
 
+function getSocietyPenaltiesStillOwing(allTransactions, members, year, asOfDate = new Date()) {
+  let total = 0;
+  let monthCount = 0;
+
+  for (const member of members) {
+    const memberTx = allTransactions.filter((t) => Number(t.member_id) === Number(member.id));
+    const statuses = getContributionMonthStatuses(
+      memberTx,
+      year,
+      member.joined_date,
+      asOfDate
+    );
+    for (const s of statuses) {
+      const pen = Number(s.penaltyOwed || 0);
+      if (pen > 0) {
+        total += pen;
+        monthCount += 1;
+      }
+    }
+  }
+
+  return { total, monthCount };
+}
+
 function getSocietyOpeningBalance(year) {
   const map = CONST.SOCIETY_OPENING_BALANCE_BY_YEAR || {};
   return Number(map[year] || 0);
@@ -891,6 +915,7 @@ module.exports = {
   canTakeLoan,
   calculateMemberBalance,
   getSocietyOpeningBalance,
+  getSocietyPenaltiesStillOwing,
   calculateSocietyBalance,
   groupTransactionsByMonth,
   CONST,

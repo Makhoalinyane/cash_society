@@ -174,7 +174,7 @@ export default function Dashboard() {
         </select>
       </div>
 
-      <div className="grid grid-4" style={{ marginBottom: '2rem' }}>
+      <div className="grid grid-5" style={{ marginBottom: '2rem' }}>
         <div className="card">
           <div className="card-title">Savings Account Balance</div>
           <div className="card-value stat-positive">{formatMoney(bal.availableBalance)}</div>
@@ -187,6 +187,13 @@ export default function Dashboard() {
           <div className="card-value stat-negative">{formatMoney(bal.outstandingLoans)}</div>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
             Still with members — not in the savings account yet
+          </p>
+        </div>
+        <div className="card">
+          <div className="card-title">Penalties Still Owing</div>
+          <div className="card-value stat-negative">{formatMoney(summary?.penaltiesStillOwing)}</div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+            Late fees not yet paid ({summary?.unpaidPenaltyMonths || 0} member-months)
           </p>
         </div>
         <div className="card">
@@ -308,6 +315,8 @@ export default function Dashboard() {
           <strong>Outstanding loans</strong> are separate: money members still owe. That cash is not in the account until they repay.
           <br />
           <strong>Total (savings + loans out)</strong> = savings + outstanding loans = <strong>{formatMoney(totalWithLoansInHands)}</strong>
+          <br />
+          <strong>Penalties still owing</strong> = late fees not yet recorded as paid across all members = <strong>{formatMoney(summary?.penaltiesStillOwing)}</strong>
           <br />
           <strong>Equal share now</strong> = savings balance ÷ active members = <strong>{formatMoney(summary?.sharePerMember)}</strong>
         </p>
