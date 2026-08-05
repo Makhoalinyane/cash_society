@@ -177,43 +177,33 @@ export default function Dashboard() {
         </select>
       </div>
 
-      <div className="grid grid-5" style={{ marginBottom: '2rem' }}>
-        <div className="card">
-          <div className="card-title">Savings Account Balance</div>
-          <div className="card-value stat-positive">{formatMoney(bal.availableBalance)}</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Cash in the society savings (opening + all money in − all money out)
-          </p>
-        </div>
-        <div className="card">
-          <div className="card-title">Outstanding Loans</div>
-          <div className="card-value stat-negative">{formatMoney(bal.outstandingLoans)}</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Still with members — not in the savings account yet
-          </p>
-        </div>
-        <div className="card">
-          <div className="card-title">Penalties Still Owing</div>
-          <div className="card-value stat-negative">{formatMoney(summary?.penaltiesStillOwing)}</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Late fees not yet paid ({summary?.unpaidPenaltyMonths || 0} member-months)
-          </p>
-        </div>
-        <div className="card">
-          <div className="card-title">If Shared Equally Now</div>
-          <div className="card-value stat-warning">{formatMoney(summary?.sharePerMember)}</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Savings ÷ {summary?.activeMembers || 0} active members
-          </p>
-        </div>
-        <div className="card">
-          <div className="card-title">Total Society Position</div>
-          <div className="card-value stat-positive">{formatMoney(totalSocietyPosition)}</div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            Savings + loans out + penalties still owing
-          </p>
-        </div>
-      </div>
+      <section className="stat-grid" aria-label="Society summary figures">
+        <article className="stat-card stat-card--positive stat-card--featured">
+          <div className="stat-card__label">Savings Account</div>
+          <div className="stat-card__value stat-positive">{formatMoney(bal.availableBalance)}</div>
+          <p className="stat-card__hint">Cash in society savings</p>
+        </article>
+        <article className="stat-card stat-card--positive stat-card--featured">
+          <div className="stat-card__label">Total Society Position</div>
+          <div className="stat-card__value stat-positive">{formatMoney(totalSocietyPosition)}</div>
+          <p className="stat-card__hint">Savings + loans out + penalties owing</p>
+        </article>
+        <article className="stat-card stat-card--negative">
+          <div className="stat-card__label">Outstanding Loans</div>
+          <div className="stat-card__value stat-negative">{formatMoney(bal.outstandingLoans)}</div>
+          <p className="stat-card__hint">Still with members</p>
+        </article>
+        <article className="stat-card stat-card--negative">
+          <div className="stat-card__label">Penalties Still Owing</div>
+          <div className="stat-card__value stat-negative">{formatMoney(summary?.penaltiesStillOwing)}</div>
+          <p className="stat-card__hint">{summary?.unpaidPenaltyMonths || 0} member-months unpaid</p>
+        </article>
+        <article className="stat-card stat-card--warning">
+          <div className="stat-card__label">Equal Share Now</div>
+          <div className="stat-card__value stat-warning">{formatMoney(summary?.sharePerMember)}</div>
+          <p className="stat-card__hint">Savings ÷ {summary?.activeMembers || 0} members</p>
+        </article>
+      </section>
 
       <div className="card" style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
