@@ -6,9 +6,11 @@
   "scripts": {
     "install:all": "npm install --prefix frontend && npm install --prefix backend",
     "build": "npm run build --prefix frontend && node scripts/copy-frontend.js",
-    "start": "npm start --prefix backend",
+    "start": "node scripts/start-production.js",
+    "start:backend": "npm start --prefix backend",
     "dev:api": "npm run dev --prefix backend",
-    "dev:web": "npm run dev --prefix frontend"
+    "dev:web": "npm run dev --prefix frontend",
+    "host:update": "bash scripts/host-update.sh"
   },
   "engines": {
     "node": ">=18"

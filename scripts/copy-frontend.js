@@ -21,4 +21,8 @@ if (!fs.existsSync(src)) {
 
 fs.rmSync(dest, { recursive: true, force: true });
 copyDir(src, dest);
-console.log(`Copied frontend build → backend/public`);
+
+// stamp so hosts can verify deploy without git
+const stamp = new Date().toISOString();
+fs.writeFileSync(path.join(dest, 'deploy-version.txt'), `${stamp}\n`, 'utf8');
+console.log(`Copied frontend build → backend/public (${stamp})`);

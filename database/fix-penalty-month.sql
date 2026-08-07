@@ -1,0 +1,14 @@
+-- Optional: fix late_penalty rows saved with payment month instead of contribution month.
+-- Example for Ts'epo Letlaka May penalty paid in August (adjust id/month as needed).
+--
+-- 1) Find late penalties:
+-- SELECT id, member_id, amount, transaction_date, transaction_month, transaction_year, description
+-- FROM transactions WHERE transaction_type = 'late_penalty' ORDER BY id;
+--
+-- 2) Set transaction_month/year to the LATE CONTRIBUTION month (not the payment day month):
+
+-- UPDATE transactions
+-- SET transaction_month = 5,
+--     transaction_year = 2026,
+--     description = 'Late penalty for May 2026 (50% of M550)'
+-- WHERE id = YOUR_PENALTY_ROW_ID;
