@@ -5,3 +5,5 @@ backend/.env
 *.log
 .DS_Store
 backend/.deploy-version
+
+database/exports/
