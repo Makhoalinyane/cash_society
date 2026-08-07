@@ -166,14 +166,77 @@ function getYearInterestPaid(transactions, year) {
     .reduce((sum, t) => sum + Number(t.amount), 0);
 }
 
+/**
+ * Months still covered by recorded late_penalty payments.
+ * 1) Exact match: penalty stored for that contribution month
+ * 2) Leftover payments (e.g. paid in August for May late fee, stored as month=8)
+ *    are applied FIFO to remaining late months that still need a fee.
+ */
+function getSettledPenaltyMonths(yearTx, monthsNeedingPenalty) {
+  const need = [...monthsNeedingPenalty].sort((a, b) => a - b);
+  const payments = yearTx
+    .filter((t) => t.transaction_type === 'late_penalty')
+    .map((t) => ({
+      month: Number(t.transaction_month),
+      id: t.id,
+      used: false,
+    }));
+
+  const settled = new Set();
+
+  for (const p of payments) {
+    if (need.includes(p.month) && !settled.has(p.month)) {
+      settled.add(p.month);
+      p.used = true;
+    }
+  }
+
+  const stillNeed = need.filter((m) => !settled.has(m));
+  const leftover = payments.filter((p) => !p.used);
+  for (let i = 0; i < leftover.length && i < stillNeed.length; i++) {
+    settled.add(stillNeed[i]);
+    leftover[i].used = true;
+  }
+
+  return settled;
+}
+
+/** Which months incur a late fee (paid late, shortfall late, or missing after deadline). */
+function getMonthsNeedingPenalty(yearTx, year, startMonth, endMonth, asOfYear, asOfMonth, asOfDay) {
+  const contributionsByMonth = {};
+  for (const t of yearTx) {
+    if (t.transaction_type === 'contribution') {
+      contributionsByMonth[t.transaction_month] = t;
+    }
+  }
+
+  const needing = new Set();
+  for (let m = startMonth; m <= endMonth; m++) {
+    const contribution = contributionsByMonth[m];
+    const isCurrentMonth = year === asOfYear && m === asOfMonth;
+    const pastDeadline = !isCurrentMonth || asOfDay > CONST.CONTRIBUTION_DUE_DAY;
+
+    if (contribution) {
+      const late = Boolean(contribution.is_late) || isContributionLate(contribution.transaction_date);
+      if (late) needing.add(m);
+    } else if (pastDeadline) {
+      needing.add(m);
+    }
+  }
+  return needing;
+}
+
 function getUnpaidPenalties(transactions, year, asOfDate = new Date()) {
-  const { year: asOfYear, month: asOfMonth } = parseDateParts(asOfDate);
+  const { year: asOfYear, month: asOfMonth, day: asOfDay } = parseDateParts(asOfDate);
   const yearTx = transactions.filter((t) => t.transaction_year === year);
-  const penaltiesPaidMonths = new Set(
-    yearTx
-      .filter((t) => t.transaction_type === 'late_penalty')
-      .map((t) => t.transaction_month)
+  const endMonth = year === asOfYear ? asOfMonth : 12;
+  const startMonth = 1;
+  if (startMonth > endMonth) return [];
+
+  const needing = getMonthsNeedingPenalty(
+    yearTx, year, startMonth, endMonth, asOfYear, asOfMonth, asOfDay
   );
+  const penaltiesPaidMonths = getSettledPenaltyMonths(yearTx, needing);
 
   return yearTx
     .filter((t) => t.transaction_type === 'contribution')
@@ -229,13 +292,15 @@ function getContributionMonthStatuses(transactions, year, joinedDate, asOfDate =
       contributionsByMonth[t.transaction_month] = t;
     }
   }
-  const penaltiesPaidMonths = new Set(
-    yearTx.filter((t) => t.transaction_type === 'late_penalty').map((t) => t.transaction_month)
-  );
 
   const startMonth = 1;
   const endMonth = year === asOfYear ? asOfMonth : 12;
   if (startMonth > endMonth) return [];
+
+  const monthsNeedingPenalty = getMonthsNeedingPenalty(
+    yearTx, year, startMonth, endMonth, asOfYear, asOfMonth, asOfDay
+  );
+  const penaltiesPaidMonths = getSettledPenaltyMonths(yearTx, monthsNeedingPenalty);
 
   const statuses = [];
   for (let m = startMonth; m <= endMonth; m++) {
