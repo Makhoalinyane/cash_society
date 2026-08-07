@@ -11,6 +11,11 @@ const TYPES = [
   { value: 'repayment', label: 'Combined Repayment (Interest + Principal)' },
 ];
 
+const MONTH_OPTIONS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 const LOAN_TYPES = ['interest', 'principal', 'repayment'];
 
 export default function RecordTransaction() {
@@ -26,6 +31,8 @@ export default function RecordTransaction() {
     mpesaReference: '',
     loanId: '',
     description: '',
+    forMonth: String(new Date().getMonth() + 1),
+    forYear: String(new Date().getFullYear()),
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -97,8 +104,12 @@ export default function RecordTransaction() {
         result = await api.recordContribution(payload);
         setSuccess(result.message || 'Contribution recorded successfully.');
       } else if (type === 'penalty') {
-        result = await api.recordPenalty(payload);
-        setSuccess(`Late penalty of ${formatMoney(form.amount)} recorded successfully.`);
+        result = await api.recordPenalty({
+          ...payload,
+          forMonth: Number(form.forMonth),
+          forYear: Number(form.forYear),
+        });
+        setSuccess(result.message || `Late penalty of ${formatMoney(form.amount)} recorded successfully.`);
       } else if (type === 'loan') {
         result = await api.recordLoan(payload);
         setSuccess(`Loan of ${formatMoney(form.amount)} disbursed. Loan ID: ${result.loanId}`);
@@ -237,6 +248,39 @@ export default function RecordTransaction() {
             <label>Transaction Date *</label>
             <input name="date" type="date" value={form.date} onChange={handleChange} required />
           </div>
+
+          {type === 'penalty' && (
+            <div className="form-group">
+              <label>Penalty is for (contribution month) *</label>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <select
+                  name="forMonth"
+                  value={form.forMonth}
+                  onChange={handleChange}
+                  required
+                  style={{ flex: '1 1 140px' }}
+                >
+                  {MONTH_OPTIONS.map((name, i) => (
+                    <option key={name} value={String(i + 1)}>{name}</option>
+                  ))}
+                </select>
+                <input
+                  name="forYear"
+                  type="number"
+                  min="2020"
+                  max="2100"
+                  value={form.forYear}
+                  onChange={handleChange}
+                  required
+                  style={{ flex: '0 0 100px' }}
+                />
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                Choose the month that was paid late (e.g. May), not only the day money was sent on M-Pesa.
+                This clears that month from “penalties still owing”.
+              </p>
+            </div>
+          )}
 
           <div className="form-group">
             <label>M-Pesa Reference</label>

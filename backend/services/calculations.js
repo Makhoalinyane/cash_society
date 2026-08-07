@@ -308,6 +308,10 @@ function getContributionMonthStatuses(transactions, year, joinedDate, asOfDate =
         });
       }
     } else if (pastDeadline) {
+      const penaltyOwed = penaltyPaid ? 0 : CONST.LATE_PENALTY_AMOUNT;
+      const penHint = penaltyPaid
+        ? `Late penalty settled; still owing contribution M${CONST.MONTHLY_CONTRIBUTION}`
+        : `Missing — owing contribution M${CONST.MONTHLY_CONTRIBUTION} + late penalty M${CONST.LATE_PENALTY_AMOUNT} (deadline was the ${CONST.CONTRIBUTION_DUE_DAY}th)`;
       statuses.push({
         month: m,
         monthName: getMonthName(m),
@@ -315,10 +319,10 @@ function getContributionMonthStatuses(transactions, year, joinedDate, asOfDate =
         status: 'overdue',
         contributionPaid: 0,
         contributionOwed: CONST.MONTHLY_CONTRIBUTION,
-        penaltyOwed: CONST.LATE_PENALTY_AMOUNT,
-        totalOwed: CONST.MONTHLY_CONTRIBUTION + CONST.LATE_PENALTY_AMOUNT,
+        penaltyOwed,
+        totalOwed: CONST.MONTHLY_CONTRIBUTION + penaltyOwed,
         paidOn: null,
-        hint: `Missing — owing contribution M${CONST.MONTHLY_CONTRIBUTION} + late penalty M${CONST.LATE_PENALTY_AMOUNT} (deadline was the ${CONST.CONTRIBUTION_DUE_DAY}th)`,
+        hint: penHint,
       });
     } else {
       statuses.push({

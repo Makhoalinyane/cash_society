@@ -55,12 +55,12 @@ router.post('/contribution', async (req, res) => {
 
 router.post('/penalty', async (req, res) => {
   try {
-    const { memberId, amount, date, mpesaReference, description } = req.body;
+    const { memberId, amount, date, mpesaReference, description, forMonth, forYear } = req.body;
     if (!memberId || !amount || !date) {
       return res.status(400).json({ error: 'memberId, amount, and date are required' });
     }
     const result = await transactionService.recordPenalty(
-      memberId, amount, date, mpesaReference, description
+      memberId, amount, date, mpesaReference, description, forMonth, forYear
     );
     res.status(201).json(result);
   } catch (err) {

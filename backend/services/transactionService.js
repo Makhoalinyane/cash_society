@@ -340,10 +340,19 @@ async function recordContribution(memberId, amount, date, mpesaRef, description)
   };
 }
 
-async function recordPenalty(memberId, amount, date, mpesaRef, description) {
-  const d = new Date(date);
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
+async function recordPenalty(memberId, amount, date, mpesaRef, description, forMonth, forYear) {
+  const paid = parseDateParts(date);
+  // Late penalty settles a *contribution month*, which may differ from the payment date
+  // (e.g. May late fee paid on 6 August). Always store the month being cleared.
+  let month = forMonth != null && forMonth !== '' ? Number(forMonth) : paid.month;
+  let year = forYear != null && forYear !== '' ? Number(forYear) : paid.year;
+
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('Penalty month must be between 1 and 12');
+  }
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    throw new Error('Penalty year is invalid');
+  }
 
   if (Number(amount) !== CONST.LATE_PENALTY_AMOUNT) {
     throw new Error(`Late penalty must be exactly M${CONST.LATE_PENALTY_AMOUNT}`);
@@ -354,16 +363,30 @@ async function recordPenalty(memberId, amount, date, mpesaRef, description) {
     [memberId, month, year]
   );
   if (existing.length > 0) {
-    throw new Error(`Late penalty for ${month}/${year} already recorded`);
+    throw new Error(`Late penalty for ${CONST.MONTH_NAMES[month - 1]} ${year} already recorded`);
   }
 
+  const monthLabel = CONST.MONTH_NAMES[month - 1];
   await pool.query(
     `INSERT INTO transactions (member_id, transaction_type, amount, transaction_date, transaction_month, transaction_year, mpesa_reference, description, is_late)
      VALUES (?, 'late_penalty', ?, ?, ?, ?, ?, ?, 1)`,
-    [memberId, amount, date, month, year, mpesaRef, description || `Late penalty (50% of M${CONST.MONTHLY_CONTRIBUTION})`]
+    [
+      memberId,
+      amount,
+      date,
+      month,
+      year,
+      mpesaRef,
+      description || `Late penalty for ${monthLabel} ${year} (50% of M${CONST.MONTHLY_CONTRIBUTION})`,
+    ]
   );
 
-  return { success: true };
+  return {
+    success: true,
+    forMonth: month,
+    forYear: year,
+    message: `Late penalty for ${monthLabel} ${year} recorded (paid on ${date}).`,
+  };
 }
 
 async function recordInterestPayment(memberId, amount, date, mpesaRef, loanId, description) {
@@ -752,15 +775,30 @@ async function updateTransaction(id, data) {
     description = existing.description,
   } = data;
 
-  const { year, month, day } = parseDateParts(date);
-  const late = existing.transaction_type === 'contribution' && day > CONST.CONTRIBUTION_DUE_DAY;
-
   if (existing.transaction_type === 'contribution' && Number(amount) !== CONST.MONTHLY_CONTRIBUTION) {
     throw new Error(`Contribution must be exactly M${CONST.MONTHLY_CONTRIBUTION}`);
   }
   if (existing.transaction_type === 'late_penalty' && Number(amount) !== CONST.LATE_PENALTY_AMOUNT) {
     throw new Error(`Late penalty must be exactly M${CONST.LATE_PENALTY_AMOUNT}`);
   }
+
+  // For late penalties, month/year = contribution month being settled (optional override)
+  let month;
+  let year;
+  let day;
+  if (existing.transaction_type === 'late_penalty') {
+    ({ day } = parseDateParts(date));
+    month = data.forMonth != null && data.forMonth !== ''
+      ? Number(data.forMonth)
+      : Number(existing.transaction_month);
+    year = data.forYear != null && data.forYear !== ''
+      ? Number(data.forYear)
+      : Number(existing.transaction_year);
+  } else {
+    ({ year, month, day } = parseDateParts(date));
+  }
+
+  const late = existing.transaction_type === 'contribution' && day > CONST.CONTRIBUTION_DUE_DAY;
   if (existing.transaction_type === 'loan_disbursement') {
     if (Number(amount) <= 0 || Number(amount) > CONST.MAX_LOAN_AMOUNT) {
       throw new Error(`Loan amount must be between M1 and M${CONST.MAX_LOAN_AMOUNT}`);
