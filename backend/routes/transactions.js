@@ -128,6 +128,21 @@ router.post('/principal', async (req, res) => {
   }
 });
 
+router.post('/payout', async (req, res) => {
+  try {
+    const { memberId, amount, date, mpesaReference, description } = req.body;
+    if (!memberId || amount == null || !date) {
+      return res.status(400).json({ error: 'memberId, amount, and date are required' });
+    }
+    const result = await transactionService.recordYearEndPayout(
+      memberId, amount, date, mpesaReference, description
+    );
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.post('/accrue-interest', async (req, res) => {
   try {
     const { year, month } = req.body;

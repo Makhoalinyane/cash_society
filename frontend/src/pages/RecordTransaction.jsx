@@ -9,6 +9,7 @@ const TYPES = [
   { value: 'interest', label: 'Interest Payment' },
   { value: 'principal', label: 'Principal Repayment' },
   { value: 'repayment', label: 'Combined Repayment (Interest + Principal)' },
+  { value: 'payout', label: 'Year-End Member Payout' },
 ];
 
 const MONTH_OPTIONS = [
@@ -69,6 +70,7 @@ export default function RecordTransaction() {
     if (type === 'contribution') setForm((f) => ({ ...f, amount: '550' }));
     if (type === 'penalty') setForm((f) => ({ ...f, amount: '275' }));
     if (type === 'loan') setForm((f) => ({ ...f, amount: '' }));
+    if (type === 'payout') setForm((f) => ({ ...f, amount: '' }));
     if (['interest', 'principal', 'repayment'].includes(type)) {
       setForm((f) => ({ ...f, amount: '', loanId: '' }));
     }
@@ -128,6 +130,11 @@ export default function RecordTransaction() {
         setSuccess(
           `Repayment recorded. Interest: ${formatMoney(result.interestPaid)}, Principal: ${formatMoney(result.principalPaid)}. Remaining: ${formatMoney(result.remainingBalance)}`
         );
+      } else if (type === 'payout') {
+        result = await api.recordYearEndPayout(payload);
+        setSuccess(
+          `Year-end payout of ${formatMoney(result.amount)} recorded. Remaining member share: ${formatMoney(result.remainingEntitlement)}. Society cash after payout: ${formatMoney(result.availableBalance)}.`
+        );
       }
       setTimeout(() => navigate(`/members/${form.memberId}`), 2000);
     } catch (err) {
@@ -144,12 +151,13 @@ export default function RecordTransaction() {
   const isBorrowingMonth = month >= 1 && month <= 9;
   const needsLoan = LOAN_TYPES.includes(type);
   const outstanding = selectedLoan ? getOutstanding(selectedLoan) : null;
+  const isPayoutMonth = month === 12;
 
   return (
     <div>
       <div className="page-header">
         <h2>Record Transaction</h2>
-        <p>Record M-Pesa contributions, penalties, loans, interest, and repayments</p>
+        <p>Record M-Pesa contributions, penalties, loans, interest, repayments, and member payouts</p>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -210,10 +218,11 @@ export default function RecordTransaction() {
             <input
               name="amount"
               type="number"
-              min="1"
               max={type === 'loan' ? '2000' : undefined}
               value={form.amount}
               onChange={handleChange}
+              min={type === 'payout' ? '0.01' : '1'}
+              step={type === 'payout' ? '0.01' : '1'}
               disabled={type === 'contribution' || type === 'penalty'}
               required
             />
@@ -242,11 +251,21 @@ export default function RecordTransaction() {
                 Loans are only allowed January–September.
               </p>
             )}
+            {type === 'payout' && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                Enter the amount paid to this member. It is deducted from the society cash total and must fit within the member&apos;s unpaid year-end share and available cash.
+              </p>
+            )}
           </div>
 
           <div className="form-group">
             <label>Transaction Date *</label>
             <input name="date" type="date" value={form.date} onChange={handleChange} required />
+            {type === 'payout' && !isPayoutMonth && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.25rem' }}>
+                Year-end payouts can only be recorded in December.
+              </p>
+            )}
           </div>
 
           {type === 'penalty' && (
@@ -292,7 +311,11 @@ export default function RecordTransaction() {
             <input name="description" value={form.description} onChange={handleChange} />
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading || (type === 'payout' && !isPayoutMonth)}
+          >
             {loading ? 'Recording...' : 'Record Transaction'}
           </button>
         </form>
@@ -309,6 +332,7 @@ export default function RecordTransaction() {
           <li>Of that interest: <strong>10%</strong> returned to member, <strong>5%</strong> kept by society</li>
           <li>Borrowing: Jan–Sep only · Repayment: Oct–Dec</li>
           <li>Year-end: <strong>no payout if owing</strong> — clear all debt by <strong>15 December</strong></li>
+          <li>Year-end payouts are recorded per member, capped at their unpaid share, and subtracted from available society cash</li>
           <li>Carry-forward: next-year payments clear prior outstanding first; penalties continue</li>
         </ul>
       </div>

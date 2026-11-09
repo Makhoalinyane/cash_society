@@ -74,6 +74,8 @@ export const api = {
     request('/transactions/interest', { method: 'POST', body: JSON.stringify(data) }),
   recordPrincipal: (data) =>
     request('/transactions/principal', { method: 'POST', body: JSON.stringify(data) }),
+  recordYearEndPayout: (data) =>
+    request('/transactions/payout', { method: 'POST', body: JSON.stringify(data) }),
   accrueInterest: (year, month) =>
     request('/transactions/accrue-interest', { method: 'POST', body: JSON.stringify({ year, month }) }),
   updateTransaction: (id, data) =>

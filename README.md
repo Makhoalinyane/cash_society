@@ -89,6 +89,7 @@ App runs at: http://localhost:3000
 - **Register Member** — Add members with phone and M-Pesa number
 - **Member Records** — Full monthly transaction breakdown (Jan–Dec), balances, loan eligibility
 - **Record Transactions** — Contributions, loans, repayments (with automatic late penalties)
+- **Year-End Member Payouts** — Record a full or partial member share in December; the amount is deducted from society cash and capped by the member's unpaid entitlement and available cash
 - **Loan Eligibility** — Shows whether a member can borrow or must clear outstanding debt first
 - **Year-End Payout Estimate** — M500 × months contributed + 10% interest rebate
 
@@ -103,6 +104,7 @@ App runs at: http://localhost:3000
 | POST | `/api/transactions/contribution` | Record M550 contribution |
 | POST | `/api/transactions/loan` | Disburse loan |
 | POST | `/api/transactions/repayment` | Record loan repayment |
+| POST | `/api/transactions/payout` | Record a December payout against a member's remaining year-end share |
 | GET | `/api/society/summary?year=2026` | Society financial summary |
 
 ## Project Structure

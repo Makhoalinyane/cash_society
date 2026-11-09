@@ -472,6 +472,18 @@ export default function MemberDetail() {
                 </strong>
               </td>
             </tr>
+            <tr>
+              <td>Already paid</td>
+              <td>{formatMoney(yearEndStatus?.yearEndPayout?.paid)}</td>
+            </tr>
+            <tr>
+              <td><strong>Remaining to pay</strong></td>
+              <td>
+                <strong className={yearEndStatus?.eligible ? 'stat-positive' : 'stat-warning'}>
+                  {formatMoney(yearEndStatus?.yearEndPayout?.remaining)}
+                </strong>
+              </td>
+            </tr>
           </tbody>
         </table>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '1rem' }}>

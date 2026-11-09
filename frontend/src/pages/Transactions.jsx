@@ -202,6 +202,11 @@ export default function Transactions() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
               {TRANSACTION_LABELS[editing.transaction_type]} · {editing.full_name}
             </p>
+            {['savings_return', 'interest_rebate'].includes(editing.transaction_type) && (
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                Payout amounts and dates are locked to protect member entitlements and society totals. Delete and re-record this payout to correct it.
+              </p>
+            )}
             <form onSubmit={saveEdit}>
               <div className="form-group">
                 <label>Amount (M)</label>
@@ -211,7 +216,10 @@ export default function Transactions() {
                   step="0.01"
                   value={editForm.amount}
                   onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
-                  disabled={editing.transaction_type === 'contribution' || editing.transaction_type === 'late_penalty'}
+                  disabled={
+                    ['contribution', 'late_penalty', 'savings_return', 'interest_rebate']
+                      .includes(editing.transaction_type)
+                  }
                   required
                 />
               </div>
@@ -221,6 +229,7 @@ export default function Transactions() {
                   type="date"
                   value={editForm.date}
                   onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                  disabled={['savings_return', 'interest_rebate'].includes(editing.transaction_type)}
                   required
                 />
               </div>

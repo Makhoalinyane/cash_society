@@ -8,6 +8,7 @@ const {
   calculateMemberBalance,
   calculateSocietyBalance,
   calculateYearEndStatus,
+  calculateYearEndPayoutProgress,
   calculateLoanSchedule,
   getChargeableInterestMonths,
   getInterestMonthSchedule,
@@ -72,6 +73,26 @@ function parseDateParts(value) {
     month: d.getMonth() + 1,
     day: d.getDate(),
   };
+}
+
+function dateKey(value) {
+  const parts = parseDateParts(value);
+  if (!Number.isInteger(parts.year) || !Number.isInteger(parts.month) || !Number.isInteger(parts.day)) {
+    return null;
+  }
+  const parsed = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  if (
+    parsed.getUTCFullYear() !== parts.year ||
+    parsed.getUTCMonth() + 1 !== parts.month ||
+    parsed.getUTCDate() !== parts.day
+  ) {
+    return null;
+  }
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+function amountToCents(value) {
+  return Math.round(Number(value) * 100);
 }
 
 async function getPrincipalFullyPaidDate(loanId, conn = null) {
@@ -305,6 +326,188 @@ async function getMemberSummary(memberId, year = new Date().getFullYear()) {
     monthlyBreakdown,
     interestAccruals: accruals,
   };
+}
+
+async function recordYearEndPayout(memberId, amount, date, mpesaRef, description) {
+  const payoutDate = dateKey(date);
+  const amountValue = Number(amount);
+  const amountCents = amountToCents(amountValue);
+  if (
+    typeof date !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    !payoutDate
+  ) {
+    throw new Error('A valid payout date is required');
+  }
+  if (
+    !Number.isFinite(amountValue) ||
+    Math.abs(amountValue * 100 - amountCents) > 0.000001 ||
+    amountCents <= 0
+  ) {
+    throw new Error('Payout amount must be greater than zero and have no more than two decimal places');
+  }
+
+  const { year, month } = parseDateParts(payoutDate);
+  if (month !== CONST.YEAR_END_PAYOUT_MONTH) {
+    throw new Error('Year-end payouts can only be recorded in December');
+  }
+
+  const deadline = `${year}-${String(CONST.YEAR_END_PAYOUT_MONTH).padStart(2, '0')}-${String(CONST.YEAR_END_PAYOUT_DAY).padStart(2, '0')}`;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Serialize payouts so concurrent requests cannot spend the same society cash.
+    await conn.query('SELECT id FROM members ORDER BY id FOR UPDATE');
+
+    const [members] = await conn.query(
+      'SELECT id, full_name, joined_date FROM members WHERE id = ?',
+      [memberId]
+    );
+    if (members.length === 0) throw new Error('Member not found');
+    const member = members[0];
+
+    const [allMemberTransactions] = await conn.query(
+      'SELECT * FROM transactions WHERE member_id = ? ORDER BY transaction_date ASC, id ASC',
+      [memberId]
+    );
+    const [allMemberLoans] = await conn.query(
+      'SELECT * FROM loans WHERE member_id = ? ORDER BY loan_date ASC, id ASC',
+      [memberId]
+    );
+    const [societyTransactions] = await conn.query(
+      'SELECT * FROM transactions WHERE transaction_year = ?',
+      [year]
+    );
+
+    const transactionsByDeadline = allMemberTransactions.filter((t) => {
+      const key = dateKey(t.transaction_date);
+      return key && key <= deadline;
+    });
+    const transactionsByPayoutDate = allMemberTransactions.filter((t) => {
+      const key = dateKey(t.transaction_date);
+      return key && key <= payoutDate;
+    });
+    const loansByDeadline = allMemberLoans
+      .filter((loan) => {
+        const key = dateKey(loan.loan_date);
+        return key && key <= deadline;
+      })
+      .map((loan) => {
+        const loanTransactions = transactionsByDeadline
+          .filter((t) => Number(t.loan_id) === Number(loan.id))
+          .sort((a, b) => dateKey(a.transaction_date).localeCompare(dateKey(b.transaction_date)));
+
+        let principalPaid = 0;
+        let principalPayoffDate = null;
+        for (const transaction of loanTransactions) {
+          if (transaction.transaction_type !== 'loan_repayment') continue;
+          principalPaid += Number(transaction.amount);
+          if (!principalPayoffDate && principalPaid >= Number(loan.principal_amount)) {
+            principalPayoffDate = dateKey(transaction.transaction_date);
+          }
+        }
+
+        const interestPaid = loanTransactions
+          .filter((t) => t.transaction_type === 'interest_payment')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+        const interestThrough = principalPayoffDate || deadline;
+        const interestMonths = getChargeableInterestMonths(loan.loan_date, interestThrough);
+        const totalInterestCharged = calculateMonthlyInterest(Number(loan.principal_amount)) * interestMonths;
+        const outstandingPrincipal = Number(loan.principal_amount) - principalPaid;
+        const outstandingInterest = totalInterestCharged - interestPaid;
+        const status = loan.status === 'defaulted'
+          ? 'defaulted'
+          : outstandingPrincipal <= 0 && outstandingInterest <= 0
+            ? 'paid'
+            : 'active';
+
+        return {
+          ...loan,
+          total_principal_paid: principalPaid,
+          total_interest_paid: interestPaid,
+          total_interest_charged: totalInterestCharged,
+          status,
+        };
+      });
+
+    const yearEndStatus = calculateYearEndStatus(
+      transactionsByDeadline,
+      loansByDeadline,
+      member.joined_date,
+      year,
+      deadline
+    );
+    if (!yearEndStatus.eligible) {
+      throw new Error(yearEndStatus.yearEndPayout.reason || 'Member is not eligible for a year-end payout');
+    }
+
+    const payoutProgress = calculateYearEndPayoutProgress(
+      yearEndStatus.potentialPayout,
+      transactionsByPayoutDate,
+      year
+    );
+    const remainingCents = Math.max(
+      0,
+      amountToCents(yearEndStatus.potentialPayout.total) - amountToCents(payoutProgress.paidTotal)
+    );
+    if (amountCents > remainingCents) {
+      throw new Error(`Payout exceeds the member's remaining year-end share of M${(remainingCents / 100).toFixed(2)}`);
+    }
+
+    const cashTransactions = societyTransactions.filter((t) => {
+      const key = dateKey(t.transaction_date);
+      return key && key <= payoutDate;
+    });
+    const availableCents = amountToCents(
+      calculateSocietyBalance(cashTransactions, [], year).availableBalance
+    );
+    if (amountCents > availableCents) {
+      throw new Error(`Payout exceeds the society's available cash of M${(Math.max(0, availableCents) / 100).toFixed(2)}`);
+    }
+
+    const savingsRemainingCents = Math.max(
+      0,
+      amountToCents(yearEndStatus.potentialPayout.savingsReturn) -
+        amountToCents(payoutProgress.paidSavingsReturn)
+    );
+    const savingsReturnCents = Math.min(amountCents, savingsRemainingCents);
+    const interestRebateCents = amountCents - savingsReturnCents;
+    const note = description || `Year-end payout ${year}`;
+
+    if (savingsReturnCents > 0) {
+      await conn.query(
+        `INSERT INTO transactions
+         (member_id, transaction_type, amount, transaction_date, transaction_month, transaction_year, mpesa_reference, description)
+         VALUES (?, 'savings_return', ?, ?, ?, ?, ?, ?)`,
+        [memberId, savingsReturnCents / 100, payoutDate, month, year, mpesaRef, note]
+      );
+    }
+    if (interestRebateCents > 0) {
+      await conn.query(
+        `INSERT INTO transactions
+         (member_id, transaction_type, amount, transaction_date, transaction_month, transaction_year, mpesa_reference, description)
+         VALUES (?, 'interest_rebate', ?, ?, ?, ?, ?, ?)`,
+        [memberId, interestRebateCents / 100, payoutDate, month, year, mpesaRef, note]
+      );
+    }
+
+    await conn.commit();
+    return {
+      success: true,
+      amount: amountCents / 100,
+      savingsReturn: savingsReturnCents / 100,
+      interestRebate: interestRebateCents / 100,
+      remainingEntitlement: (remainingCents - amountCents) / 100,
+      availableBalance: (availableCents - amountCents) / 100,
+      message: `Year-end payout of M${(amountCents / 100).toFixed(2)} recorded for ${member.full_name}.`,
+    };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 async function recordContribution(memberId, amount, date, mpesaRef, description) {
@@ -775,6 +978,13 @@ async function updateTransaction(id, data) {
     description = existing.description,
   } = data;
 
+  if (
+    ['savings_return', 'interest_rebate'].includes(existing.transaction_type) &&
+    (Number(amount) !== Number(existing.amount) || dateKey(date) !== dateKey(existing.transaction_date))
+  ) {
+    throw new Error('Year-end payout amounts and dates cannot be edited. Delete and re-record the payout instead.');
+  }
+
   if (existing.transaction_type === 'contribution' && Number(amount) !== CONST.MONTHLY_CONTRIBUTION) {
     throw new Error(`Contribution must be exactly M${CONST.MONTHLY_CONTRIBUTION}`);
   }
@@ -887,6 +1097,7 @@ module.exports = {
   recordLoanRepayment,
   recordInterestPayment,
   recordPrincipalRepayment,
+  recordYearEndPayout,
   processMonthlyInterestAccruals,
   getSocietySummary,
 };

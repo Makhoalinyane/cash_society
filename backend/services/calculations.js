@@ -583,6 +583,9 @@ function calculateYearEndStatus(allTransactions, allLoans, joinedDate, targetYea
 
   const interestPaidInYear = getYearInterestPaid(allTransactions, targetYear);
   const potentialPayout = calculateYearEndPayout(contributionMonths, interestPaidInYear);
+  const payoutProgress = calculateYearEndPayoutProgress(
+    potentialPayout, allTransactions, targetYear
+  );
 
   const eligible = totalOutstanding === 0;
   const deadline = `${CONST.YEAR_END_PAYOUT_DAY} ${CONST.MONTH_NAMES[CONST.YEAR_END_PAYOUT_MONTH - 1]} ${targetYear}`;
@@ -610,12 +613,29 @@ function calculateYearEndStatus(allTransactions, allLoans, joinedDate, targetYea
   }
 
   const yearEndPayout = eligible
-    ? { ...potentialPayout, blocked: false, eligible: true }
+    ? {
+        ...potentialPayout,
+        paid: payoutProgress.paidTotal,
+        remaining: payoutProgress.remaining,
+        savingsReturnPaid: payoutProgress.paidSavingsReturn,
+        interestRebatePaid: payoutProgress.paidInterestRebate,
+        savingsReturnRemaining: Math.max(
+          0,
+          Math.round((potentialPayout.savingsReturn - payoutProgress.paidSavingsReturn) * 100) / 100
+        ),
+        blocked: false,
+        eligible: true,
+      }
     : {
         savingsReturn: 0,
         interestRebate: 0,
         societyInterestRetained: potentialPayout.societyInterestRetained,
         total: 0,
+        paid: payoutProgress.paidTotal,
+        remaining: 0,
+        savingsReturnPaid: payoutProgress.paidSavingsReturn,
+        interestRebatePaid: payoutProgress.paidInterestRebate,
+        savingsReturnRemaining: 0,
         blocked: true,
         eligible: false,
         reason: blockedReason,
@@ -701,6 +721,28 @@ function calculateYearEndPayout(memberSavingsMonths, totalInterestPaid) {
     interestRebate,
     societyInterestRetained,
     total: savingsReturn + interestRebate,
+  };
+}
+
+function calculateYearEndPayoutProgress(payout, transactions, year) {
+  const payoutTransactions = transactions.filter(
+    (t) =>
+      Number(t.transaction_year) === Number(year) &&
+      ['savings_return', 'interest_rebate'].includes(t.transaction_type)
+  );
+  const paidSavingsReturn = payoutTransactions
+    .filter((t) => t.transaction_type === 'savings_return')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const paidInterestRebate = payoutTransactions
+    .filter((t) => t.transaction_type === 'interest_rebate')
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const paidTotal = paidSavingsReturn + paidInterestRebate;
+
+  return {
+    paidSavingsReturn,
+    paidInterestRebate,
+    paidTotal,
+    remaining: Math.max(0, Math.round((Number(payout.total) - paidTotal) * 100) / 100),
   };
 }
 
@@ -987,5 +1029,6 @@ module.exports = {
   getSocietyPenaltiesStillOwing,
   calculateSocietyBalance,
   groupTransactionsByMonth,
+  calculateYearEndPayoutProgress,
   CONST,
 };
